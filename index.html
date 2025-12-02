@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- MODIFIED: Added user-scalable=no to lock zoom for Kiosk feel -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pathfinder: Discover Your Direction</title>
+    <!-- 1. Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Configure Tailwind to use class-based dark mode
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    
+    <!-- 2. Load Google Font (Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- 4. Load Firebase SDKs (Compat version) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
+
+    <!-- 3. Custom Styles -->
+    <style>
+        /* Base Styles */
+        /* MODIFIED: prevent text selection for app-like feel */
+        body { 
+            font-family: 'Inter', sans-serif; 
+            transition: all 0.3s ease;
+            user-select: none; 
+            -webkit-user-select: none;
+        }
+        
+        /* Navigation Active State */
+        .nav-link.active { color: #2563EB; font-weight: 600; }
+        
+        /* Page Transitions */
+        .page-section { display: none; animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Toast Notification */
+        #copy-toast { visibility: hidden; opacity: 0; transition: opacity 0.3s, visibility 0.3s; }
+        #copy-toast.show { visibility: visible; opacity: 1; }
+        
+        /* --- ACCESSIBILITY MODES --- */
+        
+        /* 1. Large Text Mode */
+        html.large-text body { font-size: 115%; }
+        html.large-text h1, html.large-text h2 { font-size: 1.1em; }
+
+        /* 2. Color Blind (Grayscale) Mode */
+        html.color-blind body { filter: grayscale(100%); }
+
+        /* 3. Focus Mode */
+        body.focus-mode {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
+        body.focus-mode header, 
+        body.focus-mode footer {
+            border: none;
+            box-shadow: none;
+        }
+        body.focus-mode svg:not(.accordion-icon), 
+        body.focus-mode img {
+            display: none !important;
+        }
+        body.focus-mode .grid {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 2rem !important;
+        }
+        body.focus-mode .container {
+            max-width: 800px !important;
+        }
+        body.focus-mode .bg-white, 
+        body.focus-mode .bg-blue-50, 
+        body.focus-mode .bg-green-50 {
+            background-color: white !important;
+            border: 2px solid black !important;
+            box-shadow: none !important;
+        }
+
+        /* Accessibility Button State */
+        .access-btn.active { background-color: #3B82F6; color: white; }
+        .dark .access-btn.active { background-color: #2563EB; }
+        
+        /* Progress Bar Animation */
+        #progress-fill { transition: width 0.5s ease-in-out; }
+        
+        /* Disabled Button State */
+        .challenge-btn:disabled { cursor: not-allowed; opacity: 0.7; }
+
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-300 transition-colors duration-300">
+
+    <!-- HEADER / NAVIGATION -->
+    <header class="bg-white shadow-sm sticky top-0 z-50 dark:bg-gray-800 dark:border-b dark:border-gray-700 transition-colors duration-300">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <!-- Logo - Click to go home -->
+            <div id="logo" class="text-3xl font-extrabold text-blue-600 cursor-pointer">
+                Pathfinder
+            </div>
+            
+            <!-- Desktop Navigation Links -->
+            <div class="hidden md:flex space-x-6 items-center">
+                <a href="#home" class="nav-link text-gray-600 hover:text-blue-600 active dark:text-gray-400 dark:hover:text-white" data-translate-key="nav_home">Home</a>
+                <a href="#explore" class="nav-link text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-white" data-translate-key="nav_explore">Explore</a>
+                <a href="#learn" class="nav-link text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-white" data-translate-key="nav_learn">Learn</a>
+                <a href="#test" class="nav-link text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-white" data-translate-key="nav_test">Test</a>
+                <a href="#resources" class="nav-link text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-white" data-translate-key="nav_resources">Resources</a>
+                <a href="#comments" class="nav-link text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-white" data-translate-key="nav_comments">Comments</a>
+                <a href="#about" class="nav-link text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-white" data-translate-key="nav_about">About</a>
+            </div>
+            
+            <!-- Mobile Menu Button -->
+            <button id="mobile-menu-btn" class="md:hidden p-2 rounded-md text-gray-600 hover:text-blue-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
+                </svg>
+            </button>
+        </nav>
+        
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white shadow-lg border-t border-gray-100 dark:bg-gray-800 dark:border-gray-700">
+            <a href="#home" class="nav-link-mobile block py-3 px-6 text-gray-600 hover:bg-gray-50 hover:text-blue-600 active dark:text-gray-400 dark:hover:bg-gray-700" data-translate-key="nav_home">Home</a>
+            <a href="#explore" class="nav-link-mobile block py-3 px-6 text-gray-600 hover:bg-gray-50 hover:text-blue-600 dark:text-gray-400 dark:hover:bg-gray-700" data-translate-key="nav_explore">Explore</a>
+            <a href="#learn" class="nav-link-mobile block py-3 px-6 text-gray-600 hover:bg-gray-50 hover:text-blue-600 dark:text-gray-400 dark:hover:bg-gray-700" data-translate-key="nav_learn">Learn</a>
+            <a href="#test" class="nav-link-mobile block py-3 px-6 text-gray-600 hover:bg-gray-50 hover:text-blue-600 dark:text-gray-400 dark:hover:bg-gray-700" data-translate-key="nav_test">Test</a>
+            <a href="#resources" class="nav-link-mobile block py-3 px-6 text-gray-600 hover:bg-gray-50 hover:text-blue-600 dark:text-gray-400 dark:hover:bg-gray-700" data-translate-key="nav_resources">Resources</a>
+            <a href="#comments" class="nav-link-mobile block py-3 px-6 text-gray-600 hover:bg-gray-50 hover:text-blue-600 dark:text-gray-400 dark:hover:bg-gray-700" data-translate-key="nav_comments">Comments</a>
+            <a href="#about" class="nav-link-mobile block py-3 px-6 text-gray-600 hover:bg-gray-50 hover:text-blue-600 dark:text-gray-400 dark:hover:bg-gray-700" data-translate-key="nav_about">About</a>
+        </div>
+
+        <!-- ACCESSIBILITY TOOLBAR -->
+        <div class="bg-gray-100 border-t border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700 transition-colors duration-300">
+            <div class="container mx-auto px-6 py-2 flex flex-wrap justify-between items-center text-sm gap-y-2">
+                
+                <!-- Text Size -->
+                <div class="flex items-center space-x-2">
+                    <span class="font-semibold text-gray-700 dark:text-gray-300" data-translate-key="access_text">Text:</span>
+                    <button id="text-normal-btn" class="access-btn active text-xs px-3 py-1 rounded-full bg-blue-500 text-white dark:bg-blue-600" data-translate-key="access_normal">Normal</button>
+                    <button id="text-large-btn" class="access-btn text-xs px-3 py-1 rounded-full bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300" data-translate-key="access_large">Large</button>
+                </div>
+
+                <!-- Color Mode -->
+                <div class="flex items-center space-x-2">
+                    <span class="font-semibold text-gray-700 dark:text-gray-300" data-translate-key="access_color">Mode:</span>
+                    <button id="color-light-btn" class="access-btn active text-xs px-3 py-1 rounded-full bg-blue-500 text-white dark:bg-blue-600" data-translate-key="access_light">Light</button>
+                    <button id="color-dark-btn" class="access-btn text-xs px-3 py-1 rounded-full bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300" data-translate-key="access_dark">Dark</button>
+                    <button id="color-blind-btn" class="access-btn text-xs px-3 py-1 rounded-full bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300" data-translate-key="access_grayscale">Gray</button>
+                </div>
+
+                <!-- Focus Mode -->
+                <div class="flex items-center space-x-2">
+                    <button id="focus-mode-btn" class="access-btn text-xs px-3 py-1 rounded-full bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200 transition-colors" data-translate-key="access_focus">Focus Mode</button>
+                </div>
+
+                <!-- Language -->
+                <div class="flex items-center space-x-2">
+                    <select id="lang-select" class="text-xs px-2 py-1 rounded border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                        <option value="en">English</option>
+                        <option value="es">Español</option>
+                        <option value="zh">中文</option>
+                        <option value="ko">한국어</option>
+                        <option value="ja">日本語</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <!-- PROGRESS BAR -->
+    <div class="fixed top-[110px] md:top-[72px] left-0 w-full h-2 bg-gray-200 dark:bg-gray-700 z-40">
+        <div id="progress-fill" class="h-full bg-green-500 w-0 shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
+    </div>
+    <!-- Progress Text -->
+    <div class="fixed top-[120px] md:top-[82px] right-4 bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow-md z-40 text-xs font-bold text-green-600 dark:text-green-400 border border-gray-100 dark:border-gray-700">
+        <span id="progress-text">0% Complete</span>
+    </div>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="container mx-auto px-6 py-12 mt-8 transition-colors duration-300">
+
+        <!-- PAGE 1: HOME -->
+        <section id="page-home" class="page-section" style="display: block;">
+            
+            <!-- Default Home Content -->
+            <div id="home-default-content" class="text-center">
+                <h1 class="text-5xl md:text-6xl font-extrabold text-gray-900 leading-tight dark:text-white" data-translate-key="home_title">
+                    Feeling <span class="text-blue-600">lost</span> about your future?
+                </h1>
+                <p class="mt-6 text-xl text-gray-600 max-w-2xl mx-auto dark:text-gray-400" data-translate-key="home_subtitle">
+                    Stop searching for your "one true passion."<br>
+                    Start <span class="font-semibold">designing</span> a life you're excited to live.
+                </p>
+                <button id="start-explore-btn" class="mt-10 px-8 py-4 bg-blue-600 text-white text-lg font-semibold rounded-xl shadow-md hover:bg-blue-700 transition duration-300 dark:bg-blue-600 dark:hover:bg-blue-700" data-translate-key="home_button">
+                    Start Your Exploration
+                </button>
+            </div>
+
+            <!-- "My Journey" Dashboard -->
+            <div id="home-dashboard" class="hidden">
+                <div class="text-center mb-12">
+                    <h1 class="text-4xl font-extrabold text-gray-900 dark:text-white" data-translate-key="dashboard_title">My Journey Dashboard</h1>
+                    <p class="mt-2 text-gray-600 dark:text-gray-400" data-translate-key="dashboard_subtitle">Welcome back! Here is your current progress.</p>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                    <!-- Profile Card -->
+                    <div class="bg-blue-50 p-6 rounded-xl border border-blue-100 dark:bg-blue-900 dark:border-blue-800 transition-colors duration-300">
+                        <h3 class="text-xl font-bold text-blue-800 dark:text-blue-200" data-translate-key="dashboard_profile">Your Profile</h3>
+                        <div class="mt-4">
+                            <span id="dashboard-profile-name" class="text-3xl font-extrabold text-blue-600 dark:text-white"></span>
+                            <p class="mt-2 text-sm text-blue-700 dark:text-blue-300" data-translate-key="dashboard_based_on">Based on your quiz results.</p>
+                            <button id="dashboard-retake-btn" class="mt-4 text-sm font-semibold text-blue-600 underline dark:text-blue-300" data-translate-key="results_restart_button">Retake Quiz</button>
+                        </div>
+                    </div>
+
+                    <!-- Active Challenges Card -->
+                    <div class="bg-green-50 p-6 rounded-xl border border-green-100 dark:bg-green-900 dark:border-green-800 transition-colors duration-300">
+                        <h3 class="text-xl font-bold text-green-800 dark:text-green-200" data-translate-key="dashboard_challenges">Active Challenges</h3>
+                        <div id="dashboard-challenges-list" class="mt-4 space-y-2">
+                            <p class="text-sm text-gray-500 dark:text-gray-400 italic" data-translate-key="dashboard_no_challenges">No active challenges yet. Go to the "Test" page to start one!</p>
+                        </div>
+                        <button id="dashboard-test-btn" class="mt-4 px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition dark:bg-green-700 dark:hover:bg-green-600" data-translate-key="dashboard_find_challenge">Find a Challenge</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-20 grid md:grid-cols-3 gap-10 text-center">
+                <!-- Step 1 -->
+                <div class="bg-white p-8 rounded-xl shadow-lg dark:bg-gray-800 dark:border dark:border-gray-700 transition-colors duration-300">
+                    <div class="bg-blue-100 text-blue-600 rounded-full h-16 w-16 flex items-center justify-center mx-auto">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    </div>
+                    <h3 class="mt-5 text-2xl font-bold dark:text-white" data-translate-key="home_step1_title">1. Explore</h3>
+                    <p class="mt-2 text-gray-600 dark:text-gray-400" data-translate-key="home_step1_desc">Discover your core interests with our 5-minute Curiosity Quiz.</p>
+                </div>
+                <!-- Step 2 -->
+                <div class="bg-white p-8 rounded-xl shadow-lg dark:bg-gray-800 dark:border dark:border-gray-700 transition-colors duration-300">
+                    <div class="bg-blue-100 text-blue-600 rounded-full h-16 w-16 flex items-center justify-center mx-auto">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-1.657-1.343-3-3-3s-3 1.343-3 3v2m6 0H9m12-13a1 1 0 01-1 1H7a1 1 0 01-1-1V7a1 1 0 011-1h14a1 1 0 011 1v2z" /></svg>
+                    </div>
+                    <h3 class="mt-5 text-2xl font-bold dark:text-white" data-translate-key="home_step2_title">2. Learn</h3>
+                    <p class="mt-2 text-gray-600 dark:text-gray-400" data-translate-key="home_step2_desc">Get real-world data by "prototyping" careers with informational interviews.</p>
+                </div>
+                <!-- Step 3 -->
+                <div class="bg-white p-8 rounded-xl shadow-lg dark:bg-gray-800 dark:border dark:border-gray-700 transition-colors duration-300">
+                    <div class="bg-blue-100 text-blue-600 rounded-full h-16 w-16 flex items-center justify-center mx-auto">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <h3 class="mt-5 text-2xl font-bold dark:text-white" data-translate-key="home_step3_title">3. Test</h3>
+                    <p class="mt-2 text-gray-600 dark:text-gray-400" data-translate-key="home_step3_desc">Build competence by trying small, low-risk projects.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE 2: EXPLORE -->
+        <section id="page-explore" class="page-section">
+            <h2 class="text-4xl font-extrabold text-center dark:text-white" data-translate-key="explore_title">The Curiosity Quiz</h2>
+            <p class="text-xl text-center text-gray-600 mt-4 max-w-xl mx-auto dark:text-gray-400" data-translate-key="explore_subtitle">Answer 6 quick questions to discover your dominant interest profile.</p>
+
+            <div id="quiz-container" class="mt-12 max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-lg dark:bg-gray-800 dark:border dark:border-gray-700 transition-colors duration-300">
+                <!-- Quiz questions dynamically injected -->
+            </div>
+
+            <div id="results-container" class="hidden mt-12 max-w-2xl mx-auto bg-white p-10 rounded-xl shadow-lg text-center dark:bg-gray-800 dark:border dark:border-gray-700 transition-colors duration-300">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white" data-translate-key="results_primary">Your Primary Profile is:</h3>
+                <h2 id="result-title" class="text-5xl font-extrabold text-blue-600 my-4"></h2>
+                <p id="result-description" class="text-lg text-gray-600 dark:text-gray-400"></p>
+                
+                <div class="mt-8 p-6 bg-blue-50 rounded-lg dark:bg-gray-700 transition-colors duration-300">
+                    <h4 class="text-xl font-bold text-blue-800 dark:text-blue-200" data-translate-key="results_next_title">What's Next?</h4>
+                    <p class="mt-2 text-blue-700 dark:text-blue-300" data-translate-key="results_next_desc">You've explored your interests. Now it's time to see how they match up with the real world.</p>
+                    <button id="go-to-learn-btn" class="mt-4 px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-300 dark:bg-blue-600 dark:hover:bg-blue-700" data-translate-key="results_next_button">
+                        Step 2: Learn From Others
+                    </button>
+                    <button id="restart-quiz-btn" class="mt-4 px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition duration-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500" data-translate-key="results_restart_button">
+                        Take the Quiz Again
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE 3: LEARN -->
+        <section id="page-learn" class="page-section">
+            <h2 class="text-4xl font-extrabold text-center dark:text-white" data-translate-key="learn_title">Learn From Others</h2>
+            <p class="text-xl text-center text-gray-600 mt-4 max-w-2xl mx-auto dark:text-gray-400" data-translate-key="learn_subtitle">The best way to "prototype" a career is to talk to people already living it. It's called an informational interview.</p>
+            
+            <div class="mt-12 max-w-3xl mx-auto space-y-6">
+                <!-- Accordion Item 1 -->
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden dark:bg-gray-800 dark:border dark:border-gray-700 transition-colors duration-300">
+                    <button class="accordion-toggle w-full p-6 text-left text-2xl font-bold flex justify-between items-center dark:text-white">
+                        <span data-translate-key="learn_q1_title">What is an Informational Interview?</span>
+                        <svg class="accordion-icon w-6 h-6 transform transition-transform" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div class="accordion-content max-h-0 overflow-hidden transition-all duration-500 ease-in-out dark:bg-gray-800">
+                        <div class="p-6 pt-0 text-gray-600 text-lg dark:text-gray-400">
+                            <p data-translate-key="learn_q1_p1">It's a simple, 15-minute conversation where you are **not** asking for a job. You are only asking for someone's story.</p>
+                            <p class="mt-4" data-translate-key="learn_q1_p2">It's a low-risk, high-information way to gain authentic insights into a career path, its challenges, and its rewards, helping you make better decisions.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Accordion Item 2 -->
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden dark:bg-gray-800 dark:border dark:border-gray-700 transition-colors duration-300">
+                    <button class="accordion-toggle w-full p-6 text-left text-2xl font-bold flex justify-between items-center dark:text-white">
+                        <span data-translate-key="learn_q2_title">Email Templates (Click to Copy)</span>
+                        <svg class="accordion-icon w-6 h-6 transform transition-transform" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div class="accordion-content max-h-0 overflow-hidden transition-all duration-500 ease-in-out dark:bg-gray-800">
+                        <div class="p-6 pt-0 space-y-6">
+                            <!-- Template 1 -->
+                            <div>
+                                <h4 class="text-xl font-semibold dark:text-white" data-translate-key="learn_template1_title">Template 1: Reaching out to an Alum</h4>
+                                <pre id="template-1" class="mt-2 p-4 bg-gray-100 rounded-lg text-gray-700 whitespace-pre-wrap text-sm dark:bg-gray-700 dark:text-gray-300" data-translate-key="learn_template1_body">Subject: Pitt Student Seeking Career Advice
+
+Dear [Name],
+
+My name is [Your Name], and I'm a [Your Year] student at Pitt, majoring in [Your Major]. I found your profile on LinkedIn, and I was so impressed by your career path from Pitt to [Their Company/Role].
+
+I'm not asking for a job, only for your story.
+
+Would you be open to a brief call sometime in the next few weeks?
+
+Thank you,
+[Your Name]</pre>
+                                <button id="copy-btn-1" class="mt-2 px-4 py-2 bg-blue-100 text-blue-700 font-semibold rounded-md hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:hover:bg-blue-800 transition-colors duration-300" data-translate-key="learn_copy_button">
+                                    Copy Template
+                                </button>
+                            </div>
+                            
+                            <!-- Template 2 -->
+                            <div>
+                                <h4 class="text-xl font-semibold dark:text-white" data-translate-key="learn_template2_title">Template 2: "Cold" Outreach</h4>
+                                <pre id="template-2" class="mt-2 p-4 bg-gray-100 rounded-lg text-gray-700 whitespace-pre-wrap text-sm dark:bg-gray-700 dark:text-gray-300" data-translate-key="learn_template2_body">Subject: Student Curious About Your Work at [Company]
+
+Dear [Name],
+
+My name is [Your Name], and I'm a student at the University of Pittsburgh deeply interested in [Their Industry/Field]. I've been following your work at [Their Company] and really admire [Mention something specific, e.g., a recent project or article].
+
+I know you're busy, but I'm trying to learn more about the industry and would be so grateful for 15 minutes of your time to hear about your career journey.
+
+Would you be open to a quick call in the coming weeks?
+
+Best,
+[Your Name]</pre>
+                                <button id="copy-btn-2" class="mt-2 px-4 py-2 bg-blue-100 text-blue-700 font-semibold rounded-md hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:hover:bg-blue-800 transition-colors duration-300" data-translate-key="learn_copy_button">
+                                    Copy Template
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE 4: TEST -->
+        <section id="page-test" class="page-section">
+            <h2 class="text-4xl font-extrabold text-center dark:text-white" data-translate-key="test_title">Test Your Path</h2>
+            <p class="text-xl text-center text-gray-600 mt-4 max-w-2xl mx-auto dark:text-gray-400" data-translate-key="test_subtitle">Passion is built, not found. The final step is to build competence through small, low-risk "prototypes" or projects.</p>
+
+            <div class="mt-12 grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Items 1-6 -->
+                <!-- Item 1 -->
+                <div class="bg-white p-8 rounded-xl shadow-lg dark:bg-gray-800 dark:border dark:border-gray-700 transition-colors duration-300">
+                    <h3 class="text-2xl font-bold dark:text-white" data-translate-key="test_item1_title">Volunteer for 5 Hours</h3>
+                    <p class="mt-3 text-gray-600 dark:text-gray-400" data-translate-key="test_item1_desc">Find a non-profit related to your interest. It's a short, simple way to test the environment and see if you find the work meaningful.</p>
+                    <button class="challenge-btn mt-4 w-full py-2 rounded-md font-semibold bg-green-100 text-green-700 hover:bg-green-200 transition dark:bg-green-900 dark:text-green-200 dark:hover:bg-green-800" data-challenge-id="1" data-translate-key="test_challenge_btn">Accept Challenge</button>
+                </div>
+                <!-- Item 2 -->
+                <div class="bg-white p-8 rounded-xl shadow-lg dark:bg-gray-800 dark:border dark:border-gray-700 transition-colors duration-300">
+                    <h3 class="text-2xl font-bold dark:text-white" data-translate-key="test_item2_title">Take a 1-Day Workshop</h3>
+                    <p class="mt-3 text-gray-600 dark:text-gray-400" data-translate-key="test_item2_desc">Go on Eventbrite or Coursera and find a cheap (or free) introductory workshop. Do you enjoy the process of learning this skill?</p>
+                    <button class="challenge-btn mt-4 w-full py-2 rounded-md font-semibold bg-green-100 text-green-700 hover:bg-green-200 transition dark:bg-green-900 dark:text-green-200 dark:hover:bg-green-800" data-challenge-id="2" data-translate-key="test_challenge_btn">Accept Challenge</button>
+                </div>
+                <!-- Item 3 -->
+                <div class="bg-white p-8 rounded-xl shadow-lg dark:bg-gray-800 dark:border dark:border-gray-700 transition-colors duration-300">
+                    <h3 class="text-2xl font-bold dark:text-white" data-translate-key="test_item3_title">Start a Micro-Project</h3>
+                    <p class="mt-3 text-gray-600 dark:text-gray-400" data-translate-key="test_item3_desc">Don't write a business plan. Just *do* the smallest version of the thing. Want to be a writer? Write one blog post. A coder? Build one webpage.</p>
+                    <button class="challenge-btn mt-4 w-full py-2 rounded-md font-semibold bg-green-100 text-green-700 hover:bg-green-200 transition dark:bg-green-900 dark:text-green-200 dark:hover:bg-green-800" data-challenge-id="3" data-translate-key="test_challenge_btn">Accept Challenge</button>
+                </div>
+                <!-- Item 4 -->
+                <div class="bg-white p-8 rounded-xl shadow-lg dark:bg-gray-800 dark:border dark:border-gray-700 transition-colors duration-300">
+                    <h3 class="text-2xl font-bold dark:text-white" data-translate-key="test_item4_title">Shadow a Professional</h3>
+                    <p class="mt-3 text-gray-600 dark:text-gray-400" data-translate-key="test_item4_desc">After your informational interview, ask if you can shadow them (even virtually) for an afternoon. See the *real* day-to-day work.</p>
+                    <button class="challenge-btn mt-4 w-full py-2 rounded-md font-semibold bg-green-100 text-green-700 hover:bg-green-200 transition dark:bg-green-900 dark:text-green-200 dark:hover:bg-green-800" data-challenge-id="4" data-translate-key="test_challenge_btn">Accept Challenge</button>
+                </div>
+                <!-- Item 5 -->
+                <div class="bg-white p-8 rounded-xl shadow-lg dark:bg-gray-800 dark:border dark:border-gray-700 transition-colors duration-300">
+                    <h3 class="text-2xl font-bold dark:text-white" data-translate-key="test_item5_title">Read a Book on the Topic</h3>
+                    <p class="mt-3 text-gray-600 dark:text-gray-400" data-translate-key="test_item5_desc">Are you curious enough to read 200 pages about it? This is a great, low-cost test for genuine interest.</p>
+                    <button class="challenge-btn mt-4 w-full py-2 rounded-md font-semibold bg-green-100 text-green-700 hover:bg-green-200 transition dark:bg-green-900 dark:text-green-200 dark:hover:bg-green-800" data-challenge-id="5" data-translate-key="test_challenge_btn">Accept Challenge</button>
+                </div>
+                <!-- Item 6 -->
+                <div class="bg-white p-8 rounded-xl shadow-lg dark:bg-gray-800 dark:border dark:border-gray-700 transition-colors duration-300">
+                    <h3 class="text-2xl font-bold dark:text-white" data-translate-key="test_item6_title">Teach What You Learn</h3>
+                    <p class="mt-3 text-gray-600 dark:text-gray-400" data-translate-key="test_item6_desc">Try to explain a concept from your new field to a friend. Do you enjoy it? Does it make sense to you? Teaching is the ultimate test of competence.</p>
+                    <button class="challenge-btn mt-4 w-full py-2 rounded-md font-semibold bg-green-100 text-green-700 hover:bg-green-200 transition dark:bg-green-900 dark:text-green-200 dark:hover:bg-green-800" data-challenge-id="6" data-translate-key="test_challenge_btn">Accept Challenge</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE 5: RESOURCES -->
+        <section id="page-resources" class="page-section">
+            <h2 class="text-4xl font-extrabold text-center dark:text-white" data-translate-key="resources_title">Resource Library</h2>
+            <p class="text-xl text-center text-gray-600 mt-4 max-w-2xl mx-auto dark:text-gray-400" data-translate-key="resources_subtitle">The books, articles, and tools that inspired this project.</p>
+
+            <div class="mt-12 max-w-3xl mx-auto space-y-5">
+                <a href="https://www.amazon.com/Designing-Your-Life-Well-Lived-Joyful/dp/1101875321" target="_blank" rel="noopener noreferrer" class="block p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 dark:bg-gray-800 dark:border dark:border-gray-700 dark:hover:shadow-lg dark:hover:shadow-blue-500/10 transition-colors duration-300">
+                    <h3 class="text-xl font-bold text-blue-600" data-translate-key="resources_item1_title">Designing Your Life (Book)</h3>
+                    <p class="mt-1 text-gray-600 dark:text-gray-400" data-translate-key="resources_item1_desc">The core "design thinking" framework by Bill Burnett and Dave Evans.</p>
+                </a>
+                <a href="https://markmanson.net/screw-finding-your-passion" target="_blank" rel="noopener noreferrer" class="block p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 dark:bg-gray-800 dark:border dark:border-gray-700 dark:hover:shadow-lg dark:hover:shadow-blue-500/10 transition-colors duration-300">
+                    <h3 class="text-xl font-bold text-blue-600" data-translate-key="resources_item2_title">Screw Finding Your Passion (Article)</h3>
+                    <p class="mt-1 text-gray-600 dark:text-gray-400" data-translate-key="resources_item2_desc">The key "passion is built, not found" mindset from Mark Manson.</p>
+                </a>
+                <a href="https://joinhandshake.com/" target="_blank" rel="noopener noreferrer" class="block p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 dark:bg-gray-800 dark:border dark:border-gray-700 dark:hover:shadow-lg dark:hover:shadow-blue-500/10 transition-colors duration-300">
+                    <h3 class="text-xl font-bold text-blue-600" data-translate-key="resources_item3_title">Handshake</h3>
+                    <p class="mt-1 text-gray-600 dark:text-gray-400" data-translate-key="resources_item3_desc">The #1 career platform for college students. Great for finding internships.</p>
+                </a>
+                <a href="https://www.linkedin.com/" target="_blank" rel="noopener noreferrer" class="block p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 dark:bg-gray-800 dark:border dark:border-gray-700 dark:hover:shadow-lg dark:hover:shadow-blue-500/10 transition-colors duration-300">
+                    <h3 class="text-xl font-bold text-blue-600" data-translate-key="resources_item4_title">LinkedIn</h3>
+                    <p class="mt-1 text-gray-600 dark:text-gray-400" data-translate-key="resources_item4_desc">Essential for finding professionals for your informational interviews.</p>
+                </a>
+                <a href="https://www.careers.pitt.edu/" target="_blank" rel="noopener noreferrer" class="block p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 dark:bg-gray-800 dark:border dark:border-gray-700 dark:hover:shadow-lg dark:hover:shadow-blue-500/10 transition-colors duration-300">
+                    <h3 class="text-xl font-bold text-blue-600" data-translate-key="resources_item5_title">Pitt Career Center</h3>
+                    <p class="mt-1 text-gray-600 dark:text-gray-400" data-translate-key="resources_item5_desc">Your university's dedicated resource for career and professional development.</p>
+                </a>
+            </div>
+        </section>
+
+        <!-- PAGE 6: COMMENTS -->
+        <section id="page-comments" class="page-section">
+            <h2 class="text-4xl font-extrabold text-center dark:text-white" data-translate-key="comments_title">Comments & Suggestions</h2>
+            <p class="text-xl text-center text-gray-600 mt-4 max-w-2xl mx-auto dark:text-gray-400" data-translate-key="comments_subtitle">Leave a public comment or suggestion for this project. All feedback is welcome!</p>
+
+            <div class="mt-12 max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-lg dark:bg-gray-800 dark:border dark:border-gray-700 transition-colors duration-300">
+                <form id="comment-form" class="space-y-4">
+                    <div>
+                        <label for="comment-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300" data-translate-key="comments_form_name">Your Name (or "Anonymous")</label>
+                        <input type="text" id="comment-name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" required>
+                    </div>
+                    <div>
+                        <label for="comment-message" class="block text-sm font-medium text-gray-700 dark:text-gray-300" data-translate-key="comments_form_message">Message</label>
+                        <textarea id="comment-message" rows="4" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" required></textarea>
+                    </div>
+                    <div class="text-right">
+                        <button type="button" id="comment-submit-btn" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-300 dark:bg-blue-600 dark:hover:bg-blue-700" data-translate-key="comments_form_submit">
+                            Post Comment
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="mt-12 max-w-2xl mx-auto">
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white" data-translate-key="comments_list_title">Recent Comments</h3>
+                <div id="comment-list" class="mt-6 space-y-5">
+                    <!-- Comments will be dynamically injected here -->
+                    <p id="loading-comments" class="text-gray-500 dark:text-gray-500" data-translate-key="comments_loading">Loading comments...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE 7: ABOUT -->
+        <section id="page-about" class="page-section">
+            <h2 class="text-4xl font-extrabold text-center dark:text-white" data-translate-key="about_title">About This Project</h2>
+            <div class="mt-12 max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-lg text-lg text-gray-600 space-y-4 dark:bg-gray-800 dark:border dark:border-gray-700 dark:text-gray-400 transition-colors duration-300">
+                <p data-translate-key="about_p1">"Pathfinder" was created by **Ziyang Wang** for the course **Projects in Digital Composition**.</p>
+                <p data-translate-key="about_p2">It is an interactive digital project built on the theories that "passion is built, not found" (Mark Manson) and that one can use "design thinking" to prototype a fulfilling life and career (Burnett & Evans).</p>
+                <p data-translate-key="about_p3">The project's methodology is rooted in accessibility and user-centric design, following a **"viewer can't write"** constraint to lower anxiety and a **"inclusive design"** model to ensure the content is accessible to all users, regardless of cognitive ability, color vision, or primary language.</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="mt-20 py-8 bg-white border-t border-gray-200 dark:bg-gray-800 dark:border-t dark:border-gray-700 transition-colors duration-300">
+        <div class="container mx-auto px-6 text-center text-gray-500 dark:text-gray-500">
+            <p data-translate-key="footer_text">&copy; 2025 Ziyang Wang. A project for Projects in Digital Composition.</p>
+        </div>
+    </footer>
+
+    <!-- "Copied!" Toast Notification -->
+    <div id="copy-toast" class="fixed bottom-10 right-10 px-5 py-3 bg-gray-900 text-white text-sm font-semibold rounded-lg shadow-xl dark:bg-white dark:text-gray-900" data-translate-key="toast_copied">
+        Template copied to clipboard!
+    </div>
+
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // --- 1. TRANSLATION & CONTENT DATA ---
+        let currentLang = 'en'; 
+        let savedProfile = null;
+        let progress = 0; 
+        let completedActions = { quiz: false, template: false, challenge: false }; 
+        let autoResetTimer;
+        
+        const translations = {
+            'en': {
+                'nav_home': 'Home', 'nav_explore': 'Explore', 'nav_learn': 'Learn', 'nav_test': 'Test', 'nav_resources': 'Resources', 'nav_comments': 'Comments', 'nav_about': 'About',
+                'access_text': 'Text Size:', 'access_color': 'Color Mode:', 'access_lang': 'Language:', 'access_normal': 'Normal', 'access_large': 'Large', 'access_light': 'Light', 'access_dark': 'Dark', 'access_grayscale': 'Grayscale', 'access_focus': 'Focus Mode',
+                'home_title': 'Feeling <span class="text-blue-600">lost</span> about your future?',
+                'home_subtitle': 'Stop searching for your "one true passion."<br>Start <span class="font-semibold">designing</span> a life you\'re excited to live.',
+                'home_button': 'Start Your Exploration',
+                'home_welcome_title': 'Welcome Back!', 'home_welcome_subtitle': 'Your Pathfinder Profile is <span id="welcome-back-profile" class="font-semibold text-blue-600"></span>.', 'home_welcome_button': 'Review Your Profile',
+                'home_step1_title': '1. Explore', 'home_step1_desc': 'Discover your core interests with our 5-minute Curiosity Quiz.',
+                'home_step2_title': '2. Learn', 'home_step2_desc': 'Get real-world data by "prototyping" careers with informational interviews.',
+                'home_step3_title': '3. Test', 'home_step3_desc': 'Build competence by trying small, low-risk projects.',
+                'explore_title': 'The Curiosity Quiz', 'explore_subtitle': 'Answer 6 quick questions to discover your dominant interest profile.',
+                'results_primary': 'Your Primary Profile is:', 'results_next_title': 'What\'s Next?', 'results_next_desc': 'You\'ve explored your interests. Now it\'s time to see how they match up with the real world.', 'results_next_button': 'Step 2: Learn From Others', 'results_restart_button': 'Take the Quiz Again',
+                'learn_title': 'Learn From Others', 'learn_subtitle': 'The best way to "prototype" a career is to talk to people already living it. It\'s called an informational interview.', 'learn_q1_title': 'What is an Informational Interview?', 'learn_q1_p1': 'It\'s a simple, 15-minute conversation where you are **not** asking for a job. You are only asking for someone\'s story.', 'learn_q1_p2': 'It\'s a low-risk, high-information way to gain authentic insights into a career path, its challenges, and its rewards, helping you make better decisions.', 'learn_q2_title': 'Email Templates (Click to Copy)', 'learn_template1_title': 'Template 1: Reaching out to an Alum', 'learn_template1_body': "Subject: Pitt Student Seeking Career Advice\n\nDear [Name],\n\nMy name is [Your Name], and I'm a [Your Year] student at Pitt, majoring in [Your Major]. I found your profile on LinkedIn, and I was so impressed by your career path from Pitt to [Their Company/Role].\n\nI'm not asking for a job, only for your story.\n\nWould you be open to a brief call sometime in the next few weeks?\n\nThank you,\n[Your Name]", 'learn_template2_title': 'Template 2: "Cold" Outreach', 'learn_template2_body': "Subject: Student Curious About Your Work at [Company]\n\nDear [Name],\n\nMy name is [Your Name], and I'm a student at the University of Pittsburgh deeply interested in [Their Industry/Field]. I've been following your work at [Their Company] and really admire [Mention something specific, e.g., a recent project or article].\n\nI know you're busy, but I'm trying to learn more about the industry and would be so grateful for 15 minutes of your time to hear about your career journey.\n\nWould you be open to a quick call in the coming weeks?\n\nBest,\n[Your Name]", 'learn_copy_button': 'Copy Template',
+                'test_title': 'Test Your Path', 'test_subtitle': 'Passion is built, not found. The final step is to build competence through small, low-risk "prototypes" or projects.', 'test_item1_title': 'Volunteer for 5 Hours', 'test_item1_desc': 'Find a non-profit related to your interest. It\'s a short, simple way to test the environment and see if you find the work meaningful.', 'test_item2_title': 'Take a 1-Day Workshop', 'test_item2_desc': 'Go on Eventbrite or Coursera and find a cheap (or free) introductory workshop. Do you enjoy the process of learning this skill?', 'test_item3_title': 'Start a Micro-Project', 'test_item3_desc': 'Don\'t write a business plan. Just *do* the smallest version of the thing. Want to be a writer? Write one blog post. A coder? Build one webpage.', 'test_item4_title': 'Shadow a Professional', 'test_item4_desc': 'After your informational interview, ask if you can shadow them (even virtually) for an afternoon. See the *real* day-to-day work.', 'test_item5_title': 'Read a Book on the Topic', 'test_item5_desc': 'Are you curious enough to read 200 pages about it? This is a great, low-cost test for genuine interest.', 'test_item6_title': 'Teach What You Learn', 'test_item6_desc': 'Try to explain a concept from your new field to a friend. Do you enjoy it? Does it make sense to you? Teaching is the ultimate test of competence.', 'test_challenge_btn': 'Accept Challenge', 'test_challenge_accepted': 'Challenge Accepted!',
+                'resources_title': 'Resource Library', 'resources_subtitle': 'The books, articles, and tools that inspired this project.', 'resources_item1_title': 'Designing Your Life (Book)', 'resources_item1_desc': 'The core "design thinking" framework by Bill Burnett and Dave Evans.', 'resources_item2_title': 'Screw Finding Your Passion (Article)', 'resources_item2_desc': 'The key "passion is built, not found" mindset from Mark Manson.', 'resources_item3_title': 'Handshake', 'resources_item3_desc': 'The #1 career platform for college students. Great for finding internships.', 'resources_item4_title': 'LinkedIn', 'resources_item4_desc': 'Essential for finding professionals for your informational interviews.', 'resources_item5_title': 'Pitt Career Center', 'resources_item5_desc': 'Your university\'s dedicated resource for career and professional development.',
+                'comments_title': 'Comments & Suggestions', 'comments_subtitle': 'Leave a public comment or suggestion for this project. All feedback is welcome!', 'comments_form_name': 'Your Name (or "Anonymous")', 'comments_form_message': 'Message', 'comments_form_submit': 'Post Comment', 'comments_list_title': 'Recent Comments', 'comments_loading': 'Loading comments...', 'comments_empty': 'Be the first to comment!', 'comments_posting': 'Posting...',
+                'about_title': 'About This Project', 'about_p1': '"Pathfinder" was created by **Ziyang Wang** for the course **Projects in Digital Composition**.', 'about_p2': 'It is an interactive digital project built on the theories that "passion is built, not found" (Mark Manson) and that one can use "design thinking" to prototype a fulfilling life and career (Burnett & Evans).', 'about_p3': 'The project\'s methodology is rooted in accessibility and user-centric design, following a **"viewer can\'t write"** constraint to lower anxiety and a **"inclusive design"** model to ensure the content is accessible to all users, regardless of cognitive ability, color vision, or primary language.',
+                'footer_text': '&copy; 2025 Ziyang Wang. A project for Projects in Digital Composition.', 'toast_copied': 'Template copied to clipboard!',
+                'dashboard_title': 'My Journey Dashboard', 'dashboard_subtitle': 'Welcome back! Here is your current progress.', 'dashboard_profile': 'Your Profile', 'dashboard_based_on': 'Based on your quiz results.', 'dashboard_challenges': 'Active Challenges', 'dashboard_no_challenges': 'No active challenges yet. Go to the "Test" page to start one!', 'dashboard_find_challenge': 'Find a Challenge',
+                'profiles': { 'builder': { 'title': 'The Builder', 'description': 'You are driven by the desire to create tangible things. You enjoy seeing a project through from idea to completion, whether it\'s code, a product, or a piece of art. Your passion comes from making and doing.' }, 'organizer': { 'title': 'The Organizer', 'description': 'You thrive on creating order from chaos. You are a natural planner, coordinator, and leader. You enjoy managing systems, leading teams, and making a process more efficient. Your passion comes from building and improving systems.' }, 'thinker': { 'title': 'The Thinker', 'description': 'You are an analyzer and a problem-solver. You are driven by deep curiosity and enjoy research, data, and strategy. You\'d rather understand a complex problem than manage a simple one. Your passion comes from learning and solving.' }, 'communicator': { 'title': 'The Communicator', 'description': 'You are a "people person." You excel at teaching, storytelling, and empathy. You are drawn to roles in marketing, sales, and helping professions. Your passion comes from connecting with and helping others.' } },
+                'questions': [ { 'question': 'Which of these tasks sounds more satisfying?', 'answers': [ { 'text': 'Building a functional wooden shelf from scratch.', 'scores': { 'builder': 1 } }, { 'text': 'Organizing a 100-person event.', 'scores': { 'organizer': 1 } }, { 'text': 'Solving a complex logic puzzle.', 'scores': { 'thinker': 1 } }, { 'text': 'Teaching a difficult concept to a friend.', 'scores': { 'communicator': 1 } } ] }, { 'question': 'When working on a group project, you are most likely to...', 'answers': [ { 'text': 'Take charge and delegate all the tasks.', 'scores': { 'organizer': 1 } }, { 'text': 'Do the deep research and analysis.', 'scores': { 'thinker': 1 } }, { 'text': 'Design the final presentation and present it.', 'scores': { 'communicator': 1 } }, { 'text': 'Be the one who builds the final product/prototype.', 'scores': { 'builder': 1 } } ] }, { 'question': 'You\'re at a party. You are most likely found...', 'answers': [ { 'text': 'In a deep 1-on-1 conversation.', 'scores': { 'communicator': 1 } }, { 'text': 'Observing the group dynamics from the side.', 'scores': { 'thinker': 1 } }, { 'text': 'Helping the host check on food and drinks.', 'scores': { 'organizer': 1 } }, { 'text': 'Talking about a hobby or project you\'re building.', 'scores': { 'builder': 1 } } ] }, { 'question': 'What\'s more important to you in a job?', 'answers': [ { 'text': 'A clear path for promotion and leadership.', 'scores': { 'organizer': 1 } }, { 'text': 'Making a tangible product I can be proud of.', 'scores': { 'builder': 1 } }, { 'text': 'A strong, positive social and team environment.', 'scores': { 'communicator': 1 } }, { 'text': 'The freedom to explore complex, interesting problems.', 'scores': { 'thinker': 1 } } ] }, { 'question': 'Which "problem" sounds more interesting to solve?', 'answers': [ { 'text': 'How can we make this system 20% more efficient?', 'scores': { 'organizer': 1 } }, { 'text': 'Why does this data show a new, unexpected trend?', 'scores': { 'thinker': 1 } }, { 'text': 'What\'s the best way to build this new app idea?', 'scores': { 'builder': 1 } }, { 'text': 'How can we convince people to try this new idea?', 'scores': { 'communicator': 1 } } ] }, { 'question': 'Finally, which of these is most true for you?', 'answers': [ { 'text': 'I like to understand *why* things work.', 'scores': { 'thinker': 1 } }, { 'text': 'I like to make *new* things work.', 'scores': { 'builder': 1 } }, { 'text': 'I like to make things work *together*.', 'scores': { 'organizer': 1 } }, { 'text': 'I like to help *people* work.', 'scores': { 'communicator': 1 } } ] } ]
+            },
+            'es': {
+                'nav_comments': 'Comentarios', 'access_light': 'Claro', 'access_dark': 'Oscuro', 'test_challenge_btn': 'Aceptar Desafío', 'test_challenge_accepted': '¡Desafío Aceptado!', 'dashboard_title': 'Mi Tablero', 'dashboard_subtitle': '¡Bienvenido de nuevo!', 'dashboard_profile': 'Tu Perfil', 'dashboard_based_on': 'Basado en resultados.', 'dashboard_challenges': 'Desafíos Activos', 'dashboard_no_challenges': 'No hay desafíos activos.', 'dashboard_find_challenge': 'Encontrar Desafío', 'access_focus': 'Modo Enfoque',
+                'nav_home': 'Inicio', 'nav_explore': 'Explorar', 'nav_learn': 'Aprender', 'nav_test': 'Probar', 'nav_resources': 'Recursos', 'nav_about': 'Sobre', 'access_text': 'Tamaño:', 'access_color': 'Color:', 'access_lang': 'Idioma:', 'access_normal': 'Normal', 'access_large': 'Grande', 'access_grayscale': 'Gris', 'home_title': '¿Te sientes <span class="text-blue-600">perdido</span>?', 'home_subtitle': 'Diseña tu vida.', 'home_button': 'Empieza', 'home_step1_title': '1. Explorar', 'home_step1_desc': 'Cuestionario de Curiosidad.', 'home_step2_title': '2. Aprender', 'home_step2_desc': 'Entrevistas informativas.', 'home_step3_title': '3. Probar', 'home_step3_desc': 'Proyectos pequeños.', 'explore_title': 'Cuestionario', 'explore_subtitle': 'Responde 6 preguntas.', 'results_primary': 'Tu Perfil:', 'results_next_title': '¿Qué Sigue?', 'results_next_desc': 'Explora el mundo real.', 'results_next_button': 'Paso 2', 'results_restart_button': 'Reiniciar', 'learn_title': 'Aprender', 'learn_subtitle': 'Entrevistas informativas.', 'learn_q1_title': '¿Qué es?', 'learn_q1_p1': '15 minutos de charla.', 'learn_q1_p2': 'Bajo riesgo.', 'learn_q2_title': 'Plantillas', 'learn_template1_title': 'Plantilla 1', 'learn_template1_body': '...', 'learn_template2_title': 'Plantilla 2', 'learn_template2_body': '...', 'learn_copy_button': 'Copiar', 'test_title': 'Probar', 'test_subtitle': 'Construye competencia.', 'test_item1_title': 'Voluntario', 'test_item1_desc': '...', 'test_item2_title': 'Taller', 'test_item2_desc': '...', 'test_item3_title': 'Micro-Proyecto', 'test_item3_desc': '...', 'test_item4_title': 'Sigue a un Profesional', 'test_item4_desc': '...', 'test_item5_title': 'Lee un Libro', 'test_item5_desc': '...', 'test_item6_title': 'Enseña', 'test_item6_desc': '...', 'resources_title': 'Recursos', 'resources_subtitle': 'Herramientas útiles.', 'resources_item1_title': 'Designing Your Life', 'resources_item1_desc': '...', 'resources_item2_title': 'Article', 'resources_item2_desc': '...', 'resources_item3_title': 'Handshake', 'resources_item3_desc': '...', 'resources_item4_title': 'LinkedIn', 'resources_item4_desc': '...', 'resources_item5_title': 'Pitt Career Center', 'resources_item5_desc': '...', 'comments_title': 'Comentarios', 'comments_subtitle': 'Deja tu opinión.', 'comments_form_name': 'Nombre', 'comments_form_message': 'Mensaje', 'comments_form_submit': 'Publicar', 'comments_list_title': 'Recientes', 'comments_loading': 'Cargando...', 'comments_empty': 'Sé el primero.', 'comments_posting': 'Publicando...', 'about_title': 'Sobre', 'about_p1': 'Creado por Ziyang Wang.', 'about_p2': '...', 'about_p3': '...', 'footer_text': '© 2025 Ziyang Wang.', 'toast_copied': '¡Copiado!',
+                'profiles': { 'builder': { 'title': 'El Constructor', 'description': 'Te gusta crear.' }, 'organizer': { 'title': 'El Organizador', 'description': 'Te gusta el orden.' }, 'thinker': { 'title': 'El Pensador', 'description': 'Te gusta analizar.' }, 'communicator': { 'title': 'El Comunicador', 'description': 'Te gusta la gente.' } },
+                'questions': [
+                    { 'question': '¿Qué tarea prefieres?', 'answers': [ { 'text': 'Construir algo.', 'scores': { 'builder': 1 } }, { 'text': 'Organizar un evento.', 'scores': { 'organizer': 1 } }, { 'text': 'Resolver un puzzle.', 'scores': { 'thinker': 1 } }, { 'text': 'Enseñar a un amigo.', 'scores': { 'communicator': 1 } } ] },
+                    { 'question': 'En grupo, tú...', 'answers': [ { 'text': 'Diriges.', 'scores': { 'organizer': 1 } }, { 'text': 'Investigas.', 'scores': { 'thinker': 1 } }, { 'text': 'Presentas.', 'scores': { 'communicator': 1 } }, { 'text': 'Construyes.', 'scores': { 'builder': 1 } } ] },
+                    { 'question': 'En una fiesta...', 'answers': [ { 'text': 'Hablas 1 a 1.', 'scores': { 'communicator': 1 } }, { 'text': 'Observas.', 'scores': { 'thinker': 1 } }, { 'text': 'Ayudas.', 'scores': { 'organizer': 1 } }, { 'text': 'Hablas de hobbies.', 'scores': { 'builder': 1 } } ] },
+                    { 'question': 'Importante en trabajo...', 'answers': [ { 'text': 'Liderazgo.', 'scores': { 'organizer': 1 } }, { 'text': 'Producto tangible.', 'scores': { 'builder': 1 } }, { 'text': 'Ambiente social.', 'scores': { 'communicator': 1 } }, { 'text': 'Exploración.', 'scores': { 'thinker': 1 } } ] },
+                    { 'question': 'Problema interesante...', 'answers': [ { 'text': 'Eficiencia.', 'scores': { 'organizer': 1 } }, { 'text': 'Tendencia de datos.', 'scores': { 'thinker': 1 } }, { 'text': 'Construir App.', 'scores': { 'builder': 1 } }, { 'text': 'Persuadir.', 'scores': { 'communicator': 1 } } ] },
+                    { 'question': 'Más cierto para ti...', 'answers': [ { 'text': 'Entender por qué.', 'scores': { 'thinker': 1 } }, { 'text': 'Hacer cosas nuevas.', 'scores': { 'builder': 1 } }, { 'text': 'Coordinar cosas.', 'scores': { 'organizer': 1 } }, { 'text': 'Ayudar gente.', 'scores': { 'communicator': 1 } } ] }
+                ]
+            },
+            'zh': {
+                'nav_comments': '评论', 'access_light': '浅色', 'access_dark': '深色', 'test_challenge_btn': '接受挑战', 'test_challenge_accepted': '挑战已接受！', 'dashboard_title': '我的看板', 'dashboard_subtitle': '欢迎回来！', 'dashboard_profile': '你的档案', 'dashboard_based_on': '基于测验。', 'dashboard_challenges': '活跃挑战', 'dashboard_no_challenges': '无活跃挑战。', 'dashboard_find_challenge': '寻找挑战', 'access_focus': '专注模式',
+                'nav_home': '首页', 'nav_explore': '探索', 'nav_learn': '学习', 'nav_test': '测试', 'nav_resources': '资源', 'nav_about': '关于', 'access_text': '字号:', 'access_color': '颜色:', 'access_lang': '语言:', 'access_normal': '正常', 'access_large': '大', 'access_grayscale': '灰度', 'home_title': '感到<span class="text-blue-600">迷茫</span>？', 'home_subtitle': '设计你的生活。', 'home_button': '开始探索', 'home_step1_title': '1. 探索', 'home_step1_desc': '好奇心测验。', 'home_step2_title': '2. 学习', 'home_step2_desc': '信息访谈。', 'home_step3_title': '3. 测试', 'home_step3_desc': '小项目。', 'explore_title': '好奇心测验', 'explore_subtitle': '回答6个问题。', 'results_primary': '你的类型:', 'results_next_title': '下一步？', 'results_next_desc': '探索现实世界。', 'results_next_button': '第2步', 'results_restart_button': '重测', 'learn_title': '学习', 'learn_subtitle': '信息访谈。', 'learn_q1_title': '是什么？', 'learn_q1_p1': '15分钟谈话。', 'learn_q1_p2': '低风险。', 'learn_q2_title': '模板', 'learn_template1_title': '模板1', 'learn_template1_body': '...', 'learn_template2_title': '模板2', 'learn_template2_body': '...', 'learn_copy_button': '复制', 'test_title': '测试', 'test_subtitle': '建立能力。', 'test_item1_title': '志愿者', 'test_item1_desc': '...', 'test_item2_title': '工作坊', 'test_item2_desc': '...', 'test_item3_title': '微型项目', 'test_item3_desc': '...', 'test_item4_title': '观摩', 'test_item4_desc': '...', 'test_item5_title': '读书', 'test_item5_desc': '...', 'test_item6_title': '教学', 'test_item6_desc': '...', 'resources_title': '资源', 'resources_subtitle': '工具。', 'resources_item1_title': '设计你的生活', 'resources_item1_desc': '...', 'resources_item2_title': '文章', 'resources_item2_desc': '...', 'resources_item3_title': 'Handshake', 'resources_item3_desc': '...', 'resources_item4_title': 'LinkedIn', 'resources_item4_desc': '...', 'resources_item5_title': '皮特职业中心', 'resources_item5_desc': '...', 'comments_title': '评论', 'comments_subtitle': '留言。', 'comments_form_name': '姓名', 'comments_form_message': '信息', 'comments_form_submit': '发表', 'comments_list_title': '最新', 'comments_loading': '加载中...', 'comments_empty': '沙发。', 'comments_posting': '发表中...', 'about_title': '关于', 'about_p1': 'Ziyang Wang制作。', 'about_p2': '...', 'about_p3': '...', 'footer_text': '© 2025 Ziyang Wang.', 'toast_copied': '已复制！',
+                'profiles': { 'builder': { 'title': '建设者', 'description': '喜欢创造。' }, 'organizer': { 'title': '组织者', 'description': '喜欢秩序。' }, 'thinker': { 'title': '思考者', 'description': '喜欢分析。' }, 'communicator': { 'title': '沟通者', 'description': '喜欢人际。' } },
+                'questions': [
+                    { 'question': '哪个任务更满意？', 'answers': [ { 'text': '做木架子。', 'scores': { 'builder': 1 } }, { 'text': '组织活动。', 'scores': { 'organizer': 1 } }, { 'text': '解谜。', 'scores': { 'thinker': 1 } }, { 'text': '教朋友。', 'scores': { 'communicator': 1 } } ] },
+                    { 'question': '小组项目中...', 'answers': [ { 'text': '负责。', 'scores': { 'organizer': 1 } }, { 'text': '研究。', 'scores': { 'thinker': 1 } }, { 'text': '设计。', 'scores': { 'communicator': 1 } }, { 'text': '制作。', 'scores': { 'builder': 1 } } ] },
+                    { 'question': '聚会上...', 'answers': [ { 'text': '深聊。', 'scores': { 'communicator': 1 } }, { 'text': '观察。', 'scores': { 'thinker': 1 } }, { 'text': '帮忙。', 'scores': { 'organizer': 1 } }, { 'text': '聊项目。', 'scores': { 'builder': 1 } } ] },
+                    { 'question': '工作中重要...', 'answers': [ { 'text': '晋升。', 'scores': { 'organizer': 1 } }, { 'text': '产品。', 'scores': { 'builder': 1 } }, { 'text': '社交。', 'scores': { 'communicator': 1 } }, { 'text': '探索。', 'scores': { 'thinker': 1 } } ] },
+                    { 'question': '有趣的问题...', 'answers': [ { 'text': '效率。', 'scores': { 'organizer': 1 } }, { 'text': '趋势。', 'scores': { 'thinker': 1 } }, { 'text': '构建App。', 'scores': { 'builder': 1 } }, { 'text': '说服。', 'scores': { 'communicator': 1 } } ] },
+                    { 'question': '最符合你...', 'answers': [ { 'text': '理解为什么。', 'scores': { 'thinker': 1 } }, { 'text': '做新东西。', 'scores': { 'builder': 1 } }, { 'text': '协同工作。', 'scores': { 'organizer': 1 } }, { 'text': '帮人。', 'scores': { 'communicator': 1 } } ] }
+                ]
+            },
+            'ko': {
+                'nav_comments': '댓글', 'access_light': '라이트', 'access_dark': '다크', 'test_challenge_btn': '도전 수락', 'test_challenge_accepted': '수락됨!', 'dashboard_title': '대시보드', 'dashboard_subtitle': '환영합니다!', 'dashboard_profile': '프로필', 'dashboard_based_on': '결과 기반.', 'dashboard_challenges': '진행 중 도전', 'dashboard_no_challenges': '없음.', 'dashboard_find_challenge': '도전 찾기', 'access_focus': '집중 모드',
+                'nav_home': '홈', 'nav_explore': '탐색', 'nav_learn': '학습', 'nav_test': '테스트', 'nav_resources': '자료', 'nav_about': '소개', 'access_text': '크기:', 'access_color': '색상:', 'access_lang': '언어:', 'access_normal': '보통', 'access_large': '크게', 'access_grayscale': '회색조', 'home_title': '<span class="text-blue-600">막막</span>한가요?', 'home_subtitle': '삶을 디자인하세요.', 'home_button': '시작하기', 'home_step1_title': '1. 탐색', 'home_step1_desc': '호기심 퀴즈.', 'home_step2_title': '2. 학습', 'home_step2_desc': '정보 인터뷰.', 'home_step3_title': '3. 테스트', 'home_step3_desc': '작은 프로젝트.', 'explore_title': '퀴즈', 'explore_subtitle': '6문제.', 'results_primary': '당신의 유형:', 'results_next_title': '다음은?', 'results_next_desc': '현실 탐색.', 'results_next_button': '2단계', 'results_restart_button': '다시하기', 'learn_title': '학습', 'learn_subtitle': '인터뷰.', 'learn_q1_title': '무엇인가요?', 'learn_q1_p1': '15분 대화.', 'learn_q1_p2': '저위험.', 'learn_q2_title': '템플릿', 'learn_template1_title': '템플릿 1', 'learn_template1_body': '...', 'learn_template2_title': '템플릿 2', 'learn_template2_body': '...', 'learn_copy_button': '복사', 'test_title': '테스트', 'test_subtitle': '역량 쌓기.', 'test_item1_title': '봉사', 'test_item1_desc': '...', 'test_item2_title': '워크숍', 'test_item2_desc': '...', 'test_item3_title': '프로젝트', 'test_item3_desc': '...', 'test_item4_title': '섀도잉', 'test_item4_desc': '...', 'test_item5_title': '독서', 'test_item5_desc': '...', 'test_item6_title': '가르치기', 'test_item6_desc': '...', 'resources_title': '자료실', 'resources_subtitle': '도구.', 'resources_item1_title': 'Designing Your Life', 'resources_item1_desc': '...', 'resources_item2_title': '기사', 'resources_item2_desc': '...', 'resources_item3_title': 'Handshake', 'resources_item3_desc': '...', 'resources_item4_title': 'LinkedIn', 'resources_item4_desc': '...', 'resources_item5_title': 'Pitt 센터', 'resources_item5_desc': '...', 'comments_title': '댓글', 'comments_subtitle': '의견 남기기.', 'comments_form_name': '이름', 'comments_form_message': '메시지', 'comments_form_submit': '게시', 'comments_list_title': '최근', 'comments_loading': '로딩 중...', 'comments_empty': '첫 댓글.', 'comments_posting': '게시 중...', 'about_title': '소개', 'about_p1': 'Ziyang Wang 제작.', 'about_p2': '...', 'about_p3': '...', 'footer_text': '© 2025 Ziyang Wang.', 'toast_copied': '복사됨!',
+                'profiles': { 'builder': { 'title': '빌더', 'description': '창작 욕구.' }, 'organizer': { 'title': '오거나이저', 'description': '질서 창조.' }, 'thinker': { 'title': '사상가', 'description': '분석가.' }, 'communicator': { 'title': '커뮤니케이터', 'description': '사람 중심.' } },
+                'questions': [
+                    { 'question': '어떤 작업?', 'answers': [ { 'text': '선반 만들기.', 'scores': { 'builder': 1 } }, { 'text': '행사 기획.', 'scores': { 'organizer': 1 } }, { 'text': '퍼즐 풀기.', 'scores': { 'thinker': 1 } }, { 'text': '가르치기.', 'scores': { 'communicator': 1 } } ] },
+                    { 'question': '그룹에서...', 'answers': [ { 'text': '지휘.', 'scores': { 'organizer': 1 } }, { 'text': '연구.', 'scores': { 'thinker': 1 } }, { 'text': '디자인.', 'scores': { 'communicator': 1 } }, { 'text': '제작.', 'scores': { 'builder': 1 } } ] },
+                    { 'question': '파티에서...', 'answers': [ { 'text': '대화.', 'scores': { 'communicator': 1 } }, { 'text': '관찰.', 'scores': { 'thinker': 1 } }, { 'text': '도움.', 'scores': { 'organizer': 1 } }, { 'text': '취미 얘기.', 'scores': { 'builder': 1 } } ] },
+                    { 'question': '직업 중요?', 'answers': [ { 'text': '승진.', 'scores': { 'organizer': 1 } }, { 'text': '제품.', 'scores': { 'builder': 1 } }, { 'text': '환경.', 'scores': { 'communicator': 1 } }, { 'text': '탐구.', 'scores': { 'thinker': 1 } } ] },
+                    { 'question': '흥미 문제?', 'answers': [ { 'text': '효율.', 'scores': { 'organizer': 1 } }, { 'text': '트렌드.', 'scores': { 'thinker': 1 } }, { 'text': '앱.', 'scores': { 'builder': 1 } }, { 'text': '설득.', 'scores': { 'communicator': 1 } } ] },
+                    { 'question': '당신은?', 'answers': [ { 'text': '이유 이해.', 'scores': { 'thinker': 1 } }, { 'text': '새로운 것.', 'scores': { 'builder': 1 } }, { 'text': '함께 작동.', 'scores': { 'organizer': 1 } }, { 'text': '사람 돕기.', 'scores': { 'communicator': 1 } } ] }
+                ]
+            },
+            'ja': {
+                'nav_comments': 'コメント', 'access_light': 'ライト', 'access_dark': 'ダーク', 'test_challenge_btn': '挑戦する', 'test_challenge_accepted': '受諾！', 'dashboard_title': 'ダッシュボード', 'dashboard_subtitle': 'おかえりなさい！', 'dashboard_profile': 'プロフィール', 'dashboard_based_on': 'クイズ結果。', 'dashboard_challenges': '挑戦中', 'dashboard_no_challenges': 'なし。', 'dashboard_find_challenge': '探す', 'access_focus': 'フォーカス',
+                'nav_home': 'ホーム', 'nav_explore': '探索', 'nav_learn': '学ぶ', 'nav_test': '試す', 'nav_resources': '資料', 'nav_about': '概要', 'access_text': 'サイズ:', 'access_color': 'カラー:', 'access_lang': '言語:', 'access_normal': '標準', 'access_large': '大', 'access_grayscale': 'グレー', 'home_title': '<span class="text-blue-600">迷って</span>いますか？', 'home_subtitle': '人生をデザイン。', 'home_button': '始める', 'home_step1_title': '1. 探索', 'home_step1_desc': '好奇心クイズ。', 'home_step2_title': '2. 学ぶ', 'home_step2_desc': 'インタビュー。', 'home_step3_title': '3. 試す', 'home_step3_desc': '小プロジェクト。', 'explore_title': 'クイズ', 'explore_subtitle': '6問回答。', 'results_primary': 'あなたのタイプ:', 'results_next_title': '次は？', 'results_next_desc': '現実世界へ。', 'results_next_button': 'ステップ2', 'results_restart_button': '再試行', 'learn_title': '学ぶ', 'learn_subtitle': 'インタビュー。', 'learn_q1_title': 'とは？', 'learn_q1_p1': '15分会話。', 'learn_q1_p2': '低リスク。', 'learn_q2_title': 'テンプレ', 'learn_template1_title': 'テンプレ1', 'learn_template1_body': '...', 'learn_template2_title': 'テンプレ2', 'learn_template2_body': '...', 'learn_copy_button': 'コピー', 'test_title': '試す', 'test_subtitle': '能力構築。', 'test_item1_title': 'ボランティア', 'test_item1_desc': '...', 'test_item2_title': 'WS', 'test_item2_desc': '...', 'test_item3_title': 'プロジェクト', 'test_item3_desc': '...', 'test_item4_title': 'シャドー', 'test_item4_desc': '...', 'test_item5_title': '読書', 'test_item5_desc': '...', 'test_item6_title': '教える', 'test_item6_desc': '...', 'resources_title': '資料', 'resources_subtitle': 'ツール。', 'resources_item1_title': 'Designing Your Life', 'resources_item1_desc': '...', 'resources_item2_title': '記事', 'resources_item2_desc': '...', 'resources_item3_title': 'Handshake', 'resources_item3_desc': '...', 'resources_item4_title': 'LinkedIn', 'resources_item4_desc': '...', 'resources_item5_title': 'Pittセンター', 'resources_item5_desc': '...', 'comments_title': 'コメント', 'comments_subtitle': '意見を。', 'comments_form_name': '名前', 'comments_form_message': '内容', 'comments_form_submit': '投稿', 'comments_list_title': '最近', 'comments_loading': '読込中...', 'comments_empty': '一番乗り。', 'comments_posting': '投稿中...', 'about_title': '概要', 'about_p1': 'Ziyang Wang作。', 'about_p2': '...', 'about_p3': '...', 'footer_text': '© 2025 Ziyang Wang.', 'toast_copied': 'コピー完了！',
+                'profiles': { 'builder': { 'title': 'ビルダー', 'description': '作る欲求。' }, 'organizer': { 'title': 'オーガナイザー', 'description': '秩序を作る。' }, 'thinker': { 'title': 'シンカー', 'description': '分析家。' }, 'communicator': { 'title': 'コミュニケーター', 'description': '人好き。' } },
+                'questions': [
+                    { 'question': 'どのタスク？', 'answers': [ { 'text': '棚作り。', 'scores': { 'builder': 1 } }, { 'text': '企画。', 'scores': { 'organizer': 1 } }, { 'text': 'パズル。', 'scores': { 'thinker': 1 } }, { 'text': '教える。', 'scores': { 'communicator': 1 } } ] },
+                    { 'question': 'グループで...', 'answers': [ { 'text': '指揮。', 'scores': { 'organizer': 1 } }, { 'text': '調査。', 'scores': { 'thinker': 1 } }, { 'text': '発表。', 'scores': { 'communicator': 1 } }, { 'text': '製品。', 'scores': { 'builder': 1 } } ] },
+                    { 'question': 'パーティーで...', 'answers': [ { 'text': '会話。', 'scores': { 'communicator': 1 } }, { 'text': '観察。', 'scores': { 'thinker': 1 } }, { 'text': '手伝い。', 'scores': { 'organizer': 1 } }, { 'text': '趣味話。', 'scores': { 'builder': 1 } } ] },
+                    { 'question': '仕事で重要...', 'answers': [ { 'text': '昇進。', 'scores': { 'organizer': 1 } }, { 'text': '製品。', 'scores': { 'builder': 1 } }, { 'text': '環境。', 'scores': { 'communicator': 1 } }, { 'text': '探求。', 'scores': { 'thinker': 1 } } ] },
+                    { 'question': '面白い問題...', 'answers': [ { 'text': '効率。', 'scores': { 'organizer': 1 } }, { 'text': '傾向。', 'scores': { 'thinker': 1 } }, { 'text': 'アプリ。', 'scores': { 'builder': 1 } }, { 'text': '説得。', 'scores': { 'communicator': 1 } } ] },
+                    { 'question': 'あなたに合う...', 'answers': [ { 'text': '理由理解。', 'scores': { 'thinker': 1 } }, { 'text': '新規作成。', 'scores': { 'builder': 1 } }, { 'text': '統合。', 'scores': { 'organizer': 1 } }, { 'text': '人助け。', 'scores': { 'communicator': 1 } } ] }
+                ]
+            }
+        };
+
+        let db, auth, analytics;
+        let userId;
+        let commentsCollectionRef;
+        let userDataPath;
+        let userProfileDocRef;
+        
+        // Firebase Refs from Global Namespace (Compat SDK)
+        // No destructuing to avoid errors if firebase is undefined
+        // All firebase calls will use firebase.app, firebase.auth(), etc directly.
+
+        async function initFirebase() {
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            // --- USER MUST REPLACE CONFIG HERE ---
+            const firebaseConfig = (typeof __firebase_config !== 'undefined' && __firebase_config)
+                ? JSON.parse(__firebase_config)
+                : { 
+                    apiKey: "PASTE_YOUR_API_KEY_HERE", 
+                    authDomain: "PASTE_YOUR_AUTH_DOMAIN_HERE", 
+                    projectId: "PASTE_YOUR_PROJECT_ID_HERE",
+                    appId: "PASTE_YOUR_APP_ID_HERE"
+                }; 
+            
+            // Only init if valid config present (prevents errors in local file preview without config)
+            if (firebaseConfig.apiKey !== "PASTE_YOUR_API_KEY_HERE") {
+                try {
+                    const app = firebase.initializeApp(firebaseConfig);
+                    analytics = firebase.analytics();
+                    db = firebase.firestore();
+                    auth = firebase.auth();
+
+                    const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                    if (token) {
+                        await auth.signInWithCustomToken(token);
+                    } else {
+                        await auth.signInAnonymously();
+                    }
+                    userId = auth.currentUser ? auth.currentUser.uid : 'anonymous';
+                    
+                    setupCommentsListener(appId);
+
+                    // userDataPath = `/artifacts/${appId}/users/${userId}/userData`;
+                    // In compat, we use db.doc() directly.
+                    userProfileDocRef = db.collection('artifacts').doc(appId).collection('users').doc(userId).collection('userData').doc('profile');
+
+                    loadUserProfile();
+
+                    const commentSubmitBtn = document.getElementById('comment-submit-btn');
+                    if (commentSubmitBtn) {
+                        commentSubmitBtn.addEventListener('click', async () => {
+                            if (!db || !commentsCollectionRef) {
+                                alert("Database not connected."); return;
+                            }
+                            const name = document.getElementById('comment-name').value.trim() || 'Anonymous';
+                            const message = document.getElementById('comment-message').value.trim();
+                            if (message) {
+                                commentSubmitBtn.disabled = true;
+                                commentSubmitBtn.textContent = translations[currentLang]['comments_posting'] || 'Posting...';
+                                try {
+                                    await commentsCollectionRef.add({ name, message, timestamp: firebase.firestore.FieldValue.serverTimestamp(), userId });
+                                    document.getElementById('comment-name').value = '';
+                                    document.getElementById('comment-message').value = '';
+                                } catch (e) { console.error(e); alert("Error posting."); }
+                                finally {
+                                    commentSubmitBtn.disabled = false;
+                                    commentSubmitBtn.textContent = translations[currentLang]['comments_form_submit'] || 'Post Comment';
+                                }
+                            }
+                        });
+                    }
+                } catch (e) { console.error("Firebase Init Error:", e); }
+            }
+        }
+
+        function updateProgress(action) {
+            if (!completedActions[action]) {
+                completedActions[action] = true;
+                let count = 0;
+                if (completedActions.quiz) count++;
+                if (completedActions.template) count++;
+                if (completedActions.challenge) count++;
+                progress = Math.round((count / 3) * 100);
+                document.getElementById('progress-fill').style.width = `${progress}%`;
+                document.getElementById('progress-text').textContent = `${progress}% Complete`;
+                if(analytics) analytics.logEvent('progress_update', { percent: progress });
+            }
+        }
+
+        function setupCommentsListener(appId) {
+            // Compat syntax: db.collection()...
+            commentsCollectionRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('comments');
+            
+            commentsCollectionRef.orderBy('timestamp', 'desc').limit(50).onSnapshot((snapshot) => {
+                const loadingComments = document.getElementById('loading-comments');
+                const commentList = document.getElementById('comment-list');
+                if (loadingComments) loadingComments.style.display = 'none';
+                commentList.innerHTML = '';
+                if (snapshot.empty) commentList.innerHTML = `<p class="text-gray-500">${translations[currentLang]['comments_empty']}</p>`;
+                
+                snapshot.docs.forEach((doc) => {
+                    const comment = doc.data();
+                    const commentEl = document.createElement('div');
+                    commentEl.className = "bg-white p-4 rounded-lg shadow-sm border border-gray-200 dark:bg-gray-700 dark:border-gray-600";
+                    const date = comment.timestamp ? comment.timestamp.toDate().toLocaleString() : 'Just now';
+                    commentEl.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <h4 class="text-md font-semibold text-blue-600 dark:text-blue-400">${escapeHTML(comment.name)}</h4>
+                            <span class="text-xs text-gray-400 dark:text-gray-300">${date}</span>
+                        </div>
+                        <p class="mt-2 text-gray-700 dark:text-gray-200">${escapeHTML(comment.message)}</p>
+                    `;
+                    commentList.append(commentEl);
+                });
+            });
+        }
+
+        async function loadUserProfile() {
+            if (!userProfileDocRef) return;
+            try {
+                const docSnap = await userProfileDocRef.get();
+                if (docSnap.exists) {
+                    const data = docSnap.data();
+                    savedProfile = data.topProfile;
+                    if (savedProfile) {
+                        personalizeHomepage(savedProfile);
+                        updateProgress('quiz');
+                    }
+                    if (data.activeChallenges && data.activeChallenges.length > 0) {
+                        updateProgress('challenge');
+                        const listEl = document.getElementById('dashboard-challenges-list');
+                        if (listEl) {
+                            listEl.innerHTML = '';
+                            data.activeChallenges.forEach(id => {
+                                const btn = document.querySelector(`button[data-challenge-id="${id}"]`);
+                                if (btn) {
+                                    btn.textContent = translations[currentLang]['test_challenge_accepted'] || 'Accepted!';
+                                    btn.disabled = true;
+                                    btn.classList.add('bg-gray-400', 'cursor-not-allowed');
+                                }
+                                const p = document.createElement('p');
+                                p.className = "text-sm text-green-700 dark:text-green-300 font-semibold";
+                                p.textContent = `Challenge #${id} - In Progress`;
+                                listEl.appendChild(p);
+                            });
+                        }
+                    }
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function personalizeHomepage(profileName) {
+            const homeDefault = document.getElementById('home-default-content');
+            const homeDashboard = document.getElementById('home-dashboard');
+            const dashName = document.getElementById('dashboard-profile-name');
+            if (homeDefault && homeDashboard && dashName && translations[currentLang].profiles[profileName]) {
+                homeDefault.style.display = 'none';
+                homeDashboard.classList.remove('hidden');
+                dashName.textContent = translations[currentLang].profiles[profileName].title;
+            }
+        }
+
+        async function saveUserProfile(profileName) {
+            if (!userProfileDocRef) return;
+            await userProfileDocRef.set({ topProfile: profileName }, { merge: true });
+            savedProfile = profileName;
+            updateProgress('quiz');
+        }
+
+        async function saveChallenge(challengeId) {
+            if (!userProfileDocRef) return;
+            await userProfileDocRef.set({ activeChallenges: firebase.firestore.FieldValue.arrayUnion(challengeId) }, { merge: true });
+            updateProgress('challenge');
+        }
+
+        function copyTemplate(templateId) {
+            const text = document.getElementById(templateId).innerText;
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(showCopyToast);
+            } else {
+                const ta = document.createElement("textarea");
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showCopyToast();
+            }
+            updateProgress('template');
+        }
+
+        function showCopyToast() {
+            const toast = document.getElementById('copy-toast');
+            toast.textContent = translations[currentLang]['toast_copied'];
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>"']/g, function(m) { return {'&': '&amp;','<': '&lt;','>': '&gt;','"': '&quot;',"'": '&#39;'}[m]; });
+        }
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.querySelectorAll('[data-translate-key]').forEach(el => {
+                const key = el.getAttribute('data-translate-key');
+                if (translations[lang][key]) el.innerHTML = translations[lang][key];
+            });
+            
+            questions = translations[lang].questions && translations[lang].questions.length === 6 
+                ? translations[lang].questions 
+                : translations['en'].questions;
+            
+            profiles = translations[lang].profiles;
+
+            if (document.getElementById('page-explore').style.display === 'block') {
+                if (currentQuestionIndex >= questions.length) currentQuestionIndex = 0;
+                renderQuestion();
+            }
+            if (savedProfile) personalizeHomepage(savedProfile);
+            
+            // Update button texts dynamically
+            document.querySelectorAll('.challenge-btn').forEach(btn => {
+                if(btn.disabled) btn.textContent = translations[lang]['test_challenge_accepted'];
+                else btn.textContent = translations[lang]['test_challenge_btn'];
+            });
+        }
+
+        function renderQuestion() {
+            const container = document.getElementById('quiz-container');
+            if (!container) return;
+            const q = questions[currentQuestionIndex];
+            if (!q) return;
+
+            container.innerHTML = '';
+            const h3 = document.createElement('h3');
+            h3.className = "text-2xl font-bold text-center mb-8 dark:text-white";
+            h3.textContent = `${translations[currentLang]['explore_title']} ${currentQuestionIndex + 1} / ${questions.length}: ${q.question}`;
+            container.appendChild(h3);
+
+            const grid = document.createElement('div');
+            grid.className = "grid grid-cols-1 md:grid-cols-2 gap-4";
+            
+            q.answers.forEach(ans => {
+                const btn = document.createElement('button');
+                btn.className = "w-full p-5 text-left bg-gray-100 rounded-lg shadow-sm hover:bg-blue-100 transition dark:bg-gray-700 dark:hover:bg-blue-600 dark:text-gray-300";
+                btn.textContent = ans.text;
+                btn.onclick = () => {
+                    for(let k in ans.scores) userScores[k] += ans.scores[k];
+                    currentQuestionIndex++;
+                    if(currentQuestionIndex < questions.length) renderQuestion();
+                    else showResults();
+                };
+                grid.appendChild(btn);
+            });
+            container.appendChild(grid);
+        }
+
+        function showResults() {
+            document.getElementById('quiz-container').style.display = 'none';
+            let top = 'builder', max = 0;
+            for(let k in userScores) { if(userScores[k] > max) { max=userScores[k]; top=k; } }
+            
+            document.getElementById('result-title').textContent = profiles[top].title;
+            document.getElementById('result-description').textContent = profiles[top].description;
+            document.getElementById('results-container').style.display = 'block';
+            
+            saveUserProfile(top);
+            personalizeHomepage(top);
+        }
+
+        function showPage(pageId) {
+            document.querySelectorAll('.page-section').forEach(p => p.style.display = 'none');
+            document.getElementById(`page-${pageId}`).style.display = 'block';
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.getAttribute('href') === `#${pageId}`));
+            window.scrollTo(0, 0);
+        }
+
+        // --- INIT ---
+        document.addEventListener('DOMContentLoaded', () => {
+            questions = translations['en'].questions;
+            profiles = translations['en'].profiles;
+
+            document.getElementById('lang-select').addEventListener('change', (e) => setLanguage(e.target.value));
+            
+            // Color Mode Listeners
+            const html = document.documentElement;
+            // Helper to reset active states
+            const resetColors = () => {
+                document.getElementById('color-light-btn').classList.remove('active', 'bg-blue-500', 'text-white');
+                document.getElementById('color-dark-btn').classList.remove('active', 'bg-blue-500', 'text-white');
+                document.getElementById('color-blind-btn').classList.remove('active', 'bg-blue-500', 'text-white');
+                
+                // Add back default gray styles to all
+                ['color-light-btn', 'color-dark-btn', 'color-blind-btn'].forEach(id => {
+                    const btn = document.getElementById(id);
+                    btn.classList.add('bg-gray-200', 'text-gray-700');
+                    if(html.classList.contains('dark')) {
+                        btn.classList.remove('bg-gray-200', 'text-gray-700');
+                        btn.classList.add('dark:bg-gray-700', 'dark:text-gray-300');
+                    }
+                });
+            };
+
+            const setActive = (id) => {
+                resetColors();
+                const btn = document.getElementById(id);
+                // Remove gray styles
+                btn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-300');
+                // Add active blue style
+                btn.classList.add('active', 'bg-blue-500', 'text-white');
+            }
+
+            document.getElementById('color-light-btn').onclick = () => { 
+                html.classList.remove('dark','color-blind'); 
+                setActive('color-light-btn');
+            };
+            document.getElementById('color-dark-btn').onclick = () => { 
+                html.classList.remove('color-blind'); html.classList.add('dark'); 
+                setActive('color-dark-btn');
+            };
+            document.getElementById('color-blind-btn').onclick = () => { 
+                html.classList.remove('dark'); html.classList.add('color-blind'); 
+                setActive('color-blind-btn');
+            };
+            
+            // Text Size Listeners
+            const resetText = () => {
+                document.getElementById('text-normal-btn').classList.remove('active', 'bg-blue-500', 'text-white');
+                document.getElementById('text-large-btn').classList.remove('active', 'bg-blue-500', 'text-white');
+                // Add back defaults
+                ['text-normal-btn', 'text-large-btn'].forEach(id => {
+                     document.getElementById(id).classList.add('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-300');
+                });
+            };
+            
+            document.getElementById('text-normal-btn').onclick = () => { 
+                html.classList.remove('large-text'); 
+                resetText();
+                const btn = document.getElementById('text-normal-btn');
+                btn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-300');
+                btn.classList.add('active', 'bg-blue-500', 'text-white');
+            };
+            document.getElementById('text-large-btn').onclick = () => { 
+                html.classList.add('large-text'); 
+                resetText();
+                const btn = document.getElementById('text-large-btn');
+                btn.classList.remove('bg-gray-200', 'text-gray-700', 'dark:bg-gray-700', 'dark:text-gray-300');
+                btn.classList.add('active', 'bg-blue-500', 'text-white');
+            };
+
+            // Focus Mode Listener
+            document.getElementById('focus-mode-btn').onclick = (e) => {
+                document.body.classList.toggle('focus-mode');
+                e.target.classList.toggle('ring-2');
+                e.target.classList.toggle('ring-purple-500');
+            };
+
+            document.getElementById('start-explore-btn').addEventListener('click', () => {
+                showPage('explore'); currentQuestionIndex=0; userScores={builder:0,organizer:0,thinker:0,communicator:0};
+                document.getElementById('results-container').style.display='none';
+                document.getElementById('quiz-container').style.display='block';
+                renderQuestion();
+            });
+            
+            document.getElementById('go-to-learn-btn').addEventListener('click', () => showPage('learn'));
+            document.getElementById('restart-quiz-btn').addEventListener('click', () => {
+                showPage('explore'); currentQuestionIndex=0; userScores={builder:0,organizer:0,thinker:0,communicator:0};
+                document.getElementById('results-container').style.display='none';
+                document.getElementById('quiz-container').style.display='block';
+                renderQuestion();
+            });
+            
+            document.querySelectorAll('.challenge-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.target.getAttribute('data-challenge-id');
+                    e.target.textContent = translations[currentLang]['test_challenge_accepted'] || 'Accepted!';
+                    e.target.disabled = true;
+                    e.target.classList.add('bg-gray-400', 'cursor-not-allowed');
+                    saveChallenge(id);
+                });
+            });
+
+            document.getElementById('dashboard-retake-btn').addEventListener('click', () => {
+                 showPage('explore'); currentQuestionIndex=0; userScores={builder:0,organizer:0,thinker:0,communicator:0};
+                 document.getElementById('results-container').style.display='none';
+                 document.getElementById('quiz-container').style.display='block';
+                 renderQuestion();
+            });
+            document.getElementById('dashboard-test-btn').addEventListener('click', () => showPage('test'));
+
+            // Nav Listeners
+            document.querySelectorAll('.nav-link, .nav-link-mobile').forEach(l => {
+                l.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    showPage(e.target.getAttribute('href').substring(1));
+                    document.getElementById('mobile-menu').classList.add('hidden');
+                });
+            });
+            document.getElementById('logo').onclick = () => showPage('home');
+            document.getElementById('mobile-menu-btn').onclick = () => document.getElementById('mobile-menu').classList.toggle('hidden');
+            
+            // Accordion
+            document.querySelectorAll('.accordion-toggle').forEach(btn => {
+                btn.onclick = () => {
+                    const content = btn.nextElementSibling;
+                    const icon = btn.querySelector('.accordion-icon');
+                    if (content.style.maxHeight) { content.style.maxHeight = null; icon.style.transform = 'rotate(0deg)'; }
+                    else { content.style.maxHeight = content.scrollHeight + 'px'; icon.style.transform = 'rotate(180deg)'; }
+                };
+            });
+
+            document.getElementById('copy-btn-1').onclick = () => copyTemplate('template-1');
+            document.getElementById('copy-btn-2').onclick = () => copyTemplate('template-2');
+
+            // --- IDLE TIMER (KIOSK MODE) ---
+            function resetIdleTimer() {
+                clearTimeout(autoResetTimer);
+                // Reset after 3 minutes (180000 ms) of inactivity
+                autoResetTimer = setTimeout(() => {
+                    window.location.reload(); 
+                }, 180000); 
+            }
+            // Listen for events to reset timer
+            window.onload = resetIdleTimer;
+            document.onmousemove = resetIdleTimer;
+            document.onkeypress = resetIdleTimer;
+            document.ontouchstart = resetIdleTimer; // Touchscreens
+            document.onclick = resetIdleTimer; 
+
+            initFirebase();
+            setLanguage('en');
+            showPage('home');
+        });
+    </script>
+</body>
+</html>
